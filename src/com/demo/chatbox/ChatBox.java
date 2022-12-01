@@ -4,8 +4,10 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.Socket;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Vector;
 
 public class ChatBox {
@@ -17,19 +19,33 @@ public class ChatBox {
 
     public String chatBoxName;
 
-    public OutputStream os;
-
     public String chatObject;
 
-    public ChatBox(OutputStream os, String name) {
-        this.os = os;
-        this.chatBoxName = name;
-        this.frame = new JFrame("网络聊天室 " + chatBoxName);
-        if ("Client".equals(chatBoxName)) {
-            chatObject = "Server";
-        } else {
-            chatObject = "Client";
-        }
+    public JList<String> fList;
+
+    private final ArrayList<OutputStream> osChain;
+
+    private final String port;
+
+    public ArrayList<OutputStream> getOsChain() {
+        return osChain;
+    }
+
+    public ChatBox(String name) {
+        osChain = new ArrayList<>();
+        chatBoxName = name + " 23456";
+        port = "23456";
+        frame = new JFrame("网络聊天室 " + chatBoxName);
+        chatObject = "Client";
+    }
+
+    public ChatBox(OutputStream os, String port) {
+        osChain = new ArrayList<>();
+        osChain.add(os);
+        chatObject = "Server";
+        this.port = port;
+        chatBoxName = "Client " + port;
+        frame = new JFrame("网络聊天室 " + chatBoxName);
     }
 
     public void create() {
@@ -61,21 +77,14 @@ public class ChatBox {
         //好友列表
         Vector<String> flist = new Vector<>();
         flist.add(chatObject);
-        flist.add("小明");
-        flist.add("小鸿");
-        flist.add("小六");
-        flist.add("小王");
-        flist.add("小狗");
-        flist.add("小七");
-        flist.add("老吴");
-        flist.add("老刘");
         JList<String> friendList = new JList<>(flist);
+        this.fList = friendList;
         friendList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        friendList.addListSelectionListener(e -> {
-            String selectedValue = ((JList<?>) e.getSource()).getSelectedValue().toString();
-            upLabel.setText("当前对话:" + selectedValue);
-            frame.repaint();
-        });
+//        friendList.addListSelectionListener(e -> {
+//            String selectedValue = ((JList<?>) e.getSource()).getSelectedValue().toString();
+//            upLabel.setText("当前对话:" + selectedValue);
+//            frame.repaint();
+//        });
         JScrollPane flistScrollPanel = new JScrollPane(friendList);
         flistScrollPanel.setName("flistScrollPanel");
         flistScrollPanel.setBounds(1120, 65, 135, 450);
@@ -100,11 +109,16 @@ public class ChatBox {
                 return;
             }
             inputTextArea.setText("");
-            viewArea.append(new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new Timestamp(System.currentTimeMillis())) + "   " + chatBoxName + '\n' + message + '\n');
-            viewArea.paintImmediately(viewArea.getBounds());
-            viewArea.setCaretPosition(viewArea.getText().length());
+            if ("Client".equals(chatObject)) {
+                viewArea.append(new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new Timestamp(System.currentTimeMillis())) + "   " + chatBoxName + '\n' + message + '\n');
+                viewArea.paintImmediately(viewArea.getBounds());
+                viewArea.setCaretPosition(viewArea.getText().length());
+            }
             try {
-                os.write(message.getBytes());
+                message = chatBoxName+message;
+                for(OutputStream os: osChain){
+                    os.write(message.getBytes());
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }

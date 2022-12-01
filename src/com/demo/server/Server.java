@@ -11,7 +11,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Vector;
 import java.util.concurrent.ExecutionException;
 
 public class Server {
@@ -70,44 +73,99 @@ public class Server {
 
     public static void chatBox() throws IOException {
         ServerSocket serverSocket = new ServerSocket(23456);
+        ArrayList<Socket> sockets = new ArrayList<>();
+
+//        while(true){
         Socket socket = serverSocket.accept();
         OutputStream os = socket.getOutputStream();
         InputStream is = socket.getInputStream();
-        chatBox = new ChatBox(os, "Server");
-
-        new Thread(()->chatBox.create()).start();
-
-
-        SwingWorker<String, String> isThread = new SwingWorker<String, String>() {
-            @Override
-            protected void process(List<String> messages) {
-                Server.osUpdate(messages.get(0));
-            }
-
-            @Override
-            protected void done() {
-                super.done();
-            }
-
-            @Override
-            protected String doInBackground() throws Exception {
-                while (true) {
-                    byte[] bytes = new byte[8192];
-                    int len = is.read(bytes);
-                    String message = new String(bytes, 0, len);
-                    publish(message);
+        sockets.add(socket);
+        chatBox = new ChatBox("Server");
+        chatBox.create();
+        chatBox.getOsChain().add(os);
+        Vector<String> flist = new Vector<>();
+        flist.add("Client "+socket.getPort());
+            SwingWorker<String, String> isThread = new SwingWorker<String,String>() {
+                @Override
+                protected void process(List<String> messages) {
+                    Server.osUpdate(messages.get(0));
                 }
+
+                @Override
+                protected void done() {
+                    super.done();
+                }
+
+                @Override
+                protected String doInBackground() throws Exception {
+                    while (true) {
+                        byte[] bytes = new byte[8192];
+                        int len = is.read(bytes);
+                        String message = new String(bytes, 0, len);
+                        publish(message);
+                    }
+                }
+            };
+            isThread.execute();
+//        }
+        new Thread(()->{
+            try{
+            while(true){
+                Socket socketnew = serverSocket.accept();
+                OutputStream osnew = socketnew.getOutputStream();
+                InputStream isnew = socketnew.getInputStream();
+                sockets.add(socketnew);
+                ArrayList<OutputStream> osChain = chatBox.getOsChain();
+                osChain.add(osnew);
+                flist.add("Client "+socketnew.getPort());
+                chatBox.fList.setListData(flist);
+                SwingWorker<String, String> isThreadnew = new SwingWorker<String,String>() {
+                    @Override
+                    protected void process(List<String> messages) {
+                        Server.osUpdate(messages.get(0));
+                    }
+
+                    @Override
+                    protected void done() {
+                        super.done();
+                    }
+
+                    @Override
+                    protected String doInBackground() throws Exception {
+                        while (true) {
+                            byte[] bytes = new byte[8192];
+                            int len = isnew.read(bytes);
+                            String message = new String(bytes, 0, len);
+                            publish(message);
+                        }
+                    }
+                };
+                isThreadnew.execute();
+            }}
+            catch (Exception e){
+                e.printStackTrace();
             }
-        };
-        isThread.execute();
-
-
+        }).start();
     }
 
-    public static void osUpdate(String message) {
-        chatBox.viewArea.append(new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new Timestamp(System.currentTimeMillis())) + "   " + chatBox.upLabel.getText().subSequence(5, chatBox.upLabel.getText().length()) + '\n' + message + '\n');
+    public static void osUpdate(String info) {
+        String client = info.substring(0,6);
+        String port = (String) info.subSequence(6,12);
+        String message = info.substring(12);
+        chatBox.viewArea.append(new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new Timestamp(System.currentTimeMillis())) + "   " + client + " " + port + '\n' + message + '\n');
         chatBox.viewArea.paintImmediately(chatBox.viewArea.getBounds());
         chatBox.viewArea.setCaretPosition(chatBox.viewArea.getText().length());
+        try{
+            for(OutputStream os:chatBox.getOsChain()){
+                os.write(info.getBytes());
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public void connectChain(){
+
     }
 
     public static void main(String[] args) {

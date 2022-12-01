@@ -78,9 +78,8 @@ public class Client {
         }
         OutputStream os = socket.getOutputStream();
         InputStream is = socket.getInputStream();
-        chatBox = new ChatBox(os, "Client");
-
-        new Thread(()->chatBox.create()).start();
+        chatBox = new ChatBox(os,String.valueOf(socket.getLocalPort()));
+        chatBox.create();
 
 
         SwingWorker<String, String> isThread = new SwingWorker<String, String>() {
@@ -109,8 +108,11 @@ public class Client {
 
     }
 
-    public static void osUpdate(String message) {
-        chatBox.viewArea.append(new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new Timestamp(System.currentTimeMillis())) + "   " + chatBox.upLabel.getText().subSequence(5, chatBox.upLabel.getText().length()) + '\n' + message + '\n');
+    public static void osUpdate(String info) {
+        String client = info.substring(0,6);
+        String port = (String) info.subSequence(6,12);
+        String message = info.substring(12);
+        chatBox.viewArea.append(new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new Timestamp(System.currentTimeMillis())) + "   " + client + " " + port + '\n' + message + '\n');
         chatBox.viewArea.paintImmediately(chatBox.viewArea.getBounds());
         chatBox.viewArea.setCaretPosition(chatBox.viewArea.getText().length());
     }
