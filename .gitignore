@@ -1,5 +1,6 @@
-.gitignore
 
 out
 
 .idea
+
+.gitignore
